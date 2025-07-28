@@ -291,18 +291,42 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
 
           const print = await printWithQz(this.qz_host, result?.message?.html);
 
-          if (print === "printed") {
+          let attempts = 0;
+          let printSuccess = false;
+          let lastError = null;
+          while (attempts < 3 && !printSuccess) {
+          try {
+            if (print === "printed") {
             this.notification.createNotification("Print Successful");
             const updatePrintTable = {
               invoice: invoiceNo,
             };
-            this.call
+            await this.call
               .post("ury.ury.api.ury_print.qz_print_update", updatePrintTable)
               .then(() => {
-                window.location.reload();
-                return 200;
+              window.location.reload();
+              return 200;
               })
-              .catch((error) => console.error(error, "printed"));
+              .catch((error) => {
+              lastError = error;
+              console.error(error, "printed");
+              });
+            printSuccess = true;
+            } else {
+            throw new Error("Print failed");
+            }
+          } catch (error) {
+            lastError = error;
+            attempts++;
+            if (attempts >= 3) {
+            this.alert.createAlert(
+              "Message",
+              `Print failed after 3 attempts. Error: ${lastError?.message || lastError}`,
+              "OK"
+            );
+            this.isPrinting = false;
+            }
+          }
           }
         } else if (this.print_type === "network") {
           if (this.auth.cashier) {
